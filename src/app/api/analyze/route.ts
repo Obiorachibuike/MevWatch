@@ -2,58 +2,26 @@
 import {NextRequest, NextResponse} from 'next/server';
 import {
   detectSandwichAttack,
-  DetectSandwichAttackInput,
 } from '@/ai/flows/detect-sandwich-attack';
 import {
   analyzeTransactionTime,
   AnalyzeTransactionTimeInput,
 } from '@/ai/flows/analyze-transaction-time';
-import {z} from 'zod';
+import { apiInputSchema } from '@/lib/schemas';
 
-const sandwichSchema = z.object({
-  type: z.literal('sandwich'),
-  transactionOrdering: z.string().min(1, 'Transaction ordering is required.'),
-  gasPremiums: z.string().min(1, 'Gas premiums are required.'),
-  slippage: z.string().min(1, 'Slippage is required.'),
-});
-
-const timeAnalyzerSchema = z.object({
-  type: z.literal('time'),
-  victimTransactionTime: z.coerce
-    .number()
-    .min(1, 'Victim transaction time is required.'),
-  botTransactionTimes: z
-    .string()
-    .min(1, 'Bot transaction times are required.'),
-  botTransactionAddresses: z
-    .string()
-    .min(1, 'Bot transaction addresses are required.'),
-  blockTimeThreshold: z.coerce.number().optional().default(12),
-}).refine(data => {
-    const times = data.botTransactionTimes.split(',');
-    const addresses = data.botTransactionAddresses.split(',');
-    return times.length === addresses.length;
-}, {
-    message: "The number of bot timestamps must match the number of bot addresses.",
-});
-
-
-const inputSchema = z.discriminatedUnion('type', [
-  sandwichSchema,
-  timeAnalyzerSchema,
-]);
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const validatedFields = inputSchema.safeParse(body);
+    const validatedFields = apiInputSchema.safeParse(body);
 
     if (!validatedFields.success) {
       return NextResponse.json({error: 'Invalid input.'}, {status: 400});
     }
 
     if (validatedFields.data.type === 'sandwich') {
-      const result = await detectSandwichAttack(validatedFields.data);
+      const { type, ...rest } = validatedFields.data;
+      const result = await detectSandwichAttack(rest);
       return NextResponse.json({data: result});
     }
 
@@ -87,7 +55,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // This part should not be reachable if the schema validation is correct, but it's good for type safety.
     return NextResponse.json({ error: 'Invalid analysis type.' }, { status: 400 });
 
   } catch (e) {

@@ -86,6 +86,10 @@ export async function POST(req: NextRequest) {
         data: {...result, attacker: result.botAddresses[0] || 'N/A'},
       });
     }
+
+    // This part should not be reachable if the schema validation is correct, but it's good for type safety.
+    return NextResponse.json({ error: 'Invalid analysis type.' }, { status: 400 });
+
   } catch (e) {
     console.error(e);
     return NextResponse.json(
